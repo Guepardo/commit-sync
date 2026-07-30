@@ -8,7 +8,7 @@ import (
 	"github.com/Guepardo/commit-sync/internal/scanner"
 )
 
-func collectFromRepo(r scanner.ScanResult, dedup map[string]bool) ([]pendingCommit, map[string]plumbing.Hash) {
+func collectFromRepo(r scanner.ScanResult, dedup map[string]bool, seen map[string]bool) ([]pendingCommit, map[string]plumbing.Hash) {
 	repo, err := git.PlainOpen(r.Path)
 	if err != nil {
 		return nil, nil
@@ -39,13 +39,13 @@ func collectFromRepo(r scanner.ScanResult, dedup map[string]bool) ([]pendingComm
 		}
 		iter.ForEach(func(c *object.Commit) error {
 			k := key(r.Path, c.Hash.String())
-			if dedup[k] {
+			if dedup[k] || seen[k] {
 				return nil
 			}
 			if c.NumParents() > 1 {
 				return nil
 			}
-			dedup[k] = true
+			seen[k] = true
 			pending = append(pending, pendingCommit{
 				path:         r.Path,
 				sourceBranch: branch,
@@ -68,8 +68,9 @@ func collectFromRepo(r scanner.ScanResult, dedup map[string]bool) ([]pendingComm
 func collectPending(repos []scanner.ScanResult, dedup map[string]bool) ([]pendingCommit, map[string]plumbing.Hash) {
 	var all []pendingCommit
 	allTips := make(map[string]plumbing.Hash)
+	seen := make(map[string]bool)
 	for _, r := range repos {
-		pending, tips := collectFromRepo(r, dedup)
+		pending, tips := collectFromRepo(r, dedup, seen)
 		all = append(all, pending...)
 		for k, v := range tips {
 			allTips[k] = v

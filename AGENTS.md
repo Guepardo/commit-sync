@@ -49,3 +49,10 @@
 | config | `.goreleaser.yaml` — build cruzado linux/darwin/windows × amd64/arm64 |
 
 Use a **release skill** (`use the release skill`) quando quiser criar uma nova versão. Ela pergunta se o bump é `minir` (patch), `medium` (minor) ou `major`, calcula a próxima tag, cria e faz push. A Action de release cuida do resto.
+
+## Complexity Refactor
+
+| skill | `use the complexity-refactor skill` — roda `make complexity` e analisa o primeiro item |
+|---|---|
+
+Use a **complexity-refactor skill** (`use the complexity-refactor skill`) quando quiser identificar e analisar o método mais complexo do projeto. Ela roda `make complexity`, pega o primeiro item, lê o código-fonte e sugere refatorações baseadas nas três causas de complexidade (Change Amplification, Cognitive Load, Unknown Unknowns). O agente apenas analisa — nunca modifica código. Rode novamente para analisar o próximo item da lista.
