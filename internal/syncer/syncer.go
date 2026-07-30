@@ -117,47 +117,7 @@ func (s *Syncer) Sync(repos []scanner.ScanResult) (int, error) {
 		return 0, fmt.Errorf("dedup: %w", err)
 	}
 
-	var pending []pendingCommit
-
-	for _, r := range repos {
-		repo, err := git.PlainOpen(r.Path)
-		if err != nil {
-			continue
-		}
-
-		head, err := repo.Head()
-		if err != nil {
-			continue
-		}
-
-		iter, err := repo.Log(&git.LogOptions{From: head.Hash()})
-		if err != nil {
-			continue
-		}
-
-		iter.ForEach(func(c *object.Commit) error {
-			if dedup[key(r.Path, c.Hash.String())] {
-				return nil
-			}
-
-			if c.NumParents() > 1 {
-				return nil
-			}
-
-			pending = append(pending, pendingCommit{
-				path:      r.Path,
-				hash:      c.Hash,
-				author:    c.Author,
-				committer: c.Committer,
-				tree:      c.TreeHash,
-				msg:       c.Message,
-				when:      c.Author.When,
-			})
-			return nil
-		})
-		iter.Close()
-	}
-
+	pending := collectPending(repos, dedup)
 	if len(pending) == 0 {
 		return 0, nil
 	}
@@ -179,44 +139,15 @@ func (s *Syncer) Sync(repos []scanner.ScanResult) (int, error) {
 		lastHash = head.Hash()
 	}
 
-	storer := mirrorRepo.Storer
-
-	for _, p := range pending {
-		msg := appendMirroredFrom(p.msg, p.path, p.hash.String())
-
-		var parentHashes []plumbing.Hash
-		if lastHash != plumbing.ZeroHash {
-			parentHashes = []plumbing.Hash{lastHash}
-		}
-
-		commit := &object.Commit{
-			Author:       p.author,
-			Committer:    p.committer,
-			Message:      msg,
-			TreeHash:     p.tree,
-			ParentHashes: parentHashes,
-		}
-
-		obj := storer.NewEncodedObject()
-		if err := commit.Encode(obj); err != nil {
-			return 0, fmt.Errorf("encode commit: %w", err)
-		}
-		newHash, err := storer.SetEncodedObject(obj)
-		if err != nil {
-			return 0, fmt.Errorf("store commit: %w", err)
-		}
-
-		lastHash = newHash
+	lastHash, err = writeCommits(mirrorRepo.Storer, pending, lastHash)
+	if err != nil {
+		return 0, err
 	}
 
-	ref := plumbing.NewHashReference(plumbing.ReferenceName(mirrorBranch), lastHash)
-	if err := storer.SetReference(ref); err != nil {
-		return 0, fmt.Errorf("set ref: %w", err)
-	}
-
-	headRef := plumbing.NewSymbolicReference(plumbing.HEAD, plumbing.ReferenceName(mirrorBranch))
-	if err := storer.SetReference(headRef); err != nil {
-		return 0, fmt.Errorf("set HEAD: %w", err)
+	if lastHash != plumbing.ZeroHash {
+		if err := updateMirrorRefs(mirrorRepo.Storer, lastHash); err != nil {
+			return 0, err
+		}
 	}
 
 	return len(pending), nil
