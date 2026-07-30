@@ -6,12 +6,53 @@ Sincroniza commits de repositórios Git locais **sem remote** em um único repos
 
 Repositórios Git sem remote (criados com `git init` para experimentos ou estudos) ficam isolados — seus commits não são versionados em lugar nenhum. O `commit-sync` descobre esses repositórios e replica os commits em um mirror central, em ordem cronológica linear.
 
-## Como funciona
+## Arquitetura
 
-1. **Varredura** — percorre um diretório raiz recursivamente atrás de pastas `.git`
-2. **Filtro** — mantém apenas repositórios **sem nenhum remote** configurado; exclui o próprio mirror
-3. **Deduplicação** — cada commit espelhado recebe um trailer `Mirrored-From: <path> <hash>` na mensagem; na próxima execução commits já sincronizados são ignorados
-4. **Sincronização** — commits não-merge são ordenados por data e recriados no mirror em uma branch linear `main`, preservando author, committer, data, mensagem e conteúdo dos arquivos
+```
+                           ┌─────────────────────────────┐
+                           │   commit-sync set-mirror     │
+                           │   ~/meu-mirror               │
+                           └────────────┬────────────────┘
+                                        │
+                                        ▼
+                           ┌─────────────────────────────┐
+                           │    ~/.config/commit-sync/   │
+                           │       config.json           │
+                           │   { "mirror_path": "..." }  │
+                           └────────────┬────────────────┘
+                                        │
+              ┌─────────────────────────┼─────────────────────────┐
+              │                         │                         │
+              ▼                         ▼                         ▼
+  ┌─────────────────────┐   ┌─────────────────────┐   ┌─────────────────────┐
+  │  scan <root>        │   │  sync <root>        │   │  status             │
+  │                     │   │                     │   │                     │
+  │  filepath.WalkDir   │   │  scanner.Scan()     │   │  git.PlainOpen()    │
+  │     ↓               │   │     ↓               │   │     ↓               │
+  │  detecta .git/      │   │  syncer.Sync()      │   │  exibe estado      │
+  │     ↓               │   │     ↓               │   │                     │
+  │  git.Remotes() == 0 │   │  constrói dedup map │   └─────────────────────┘
+  │     ↓               │   │  (lê mirror commits)│
+  │  lista resultados   │   │     ↓               │
+  └─────────────────────┘   │  itera source repos │
+                            │     ↓               │
+                            │  ordena por data    │
+                            │     ↓               │
+                            │  cria commits no    │
+                            │  mirror com trailer │
+                            │  Mirrored-From:     │
+                            │     ↓               │
+                            │  atualiza refs/     │
+                            │  heads/main         │
+                            └─────────────────────┘
+```
+
+## Fluxo
+
+1. **`set-mirror <path>`** — salva o caminho do mirror no `config.json`
+2. **`scan <root>`** — percorre `<root>` recursivamente atrás de pastas `.git`; filtra apenas repositórios **sem nenhum remote**; exclui o próprio mirror
+3. **`sync <root>`** — para cada repositório encontrado, lê os commits da branch default; ignora merge commits e commits já sincronizados (via trailer `Mirrored-From`); ordena tudo por data e recria no mirror em ordem linear
+4. **`status`** — exibe o caminho do mirror, branch e total de commits sincronizados
 
 ## Instalação
 
