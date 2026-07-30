@@ -8,7 +8,49 @@ import (
 	"github.com/go-git/go-git/v5/storage"
 )
 
-func writeSingleCommit(storer storage.Storer, p pendingCommit, lastHash plumbing.Hash) (plumbing.Hash, error) {
+func copyObject(srcStorer, dstStorer storage.Storer, hash plumbing.Hash, seen map[plumbing.Hash]bool) error {
+	if seen[hash] {
+		return nil
+	}
+	seen[hash] = true
+
+	_, err := dstStorer.EncodedObject(plumbing.AnyObject, hash)
+	if err == nil {
+		return nil
+	}
+	if err != plumbing.ErrObjectNotFound {
+		return err
+	}
+
+	obj, err := srcStorer.EncodedObject(plumbing.AnyObject, hash)
+	if err != nil {
+		return fmt.Errorf("read %s from source: %w", hash, err)
+	}
+
+	if obj.Type() == plumbing.TreeObject {
+		tree := &object.Tree{}
+		if err := tree.Decode(obj); err != nil {
+			return fmt.Errorf("decode tree %s: %w", hash, err)
+		}
+		for _, entry := range tree.Entries {
+			if err := copyObject(srcStorer, dstStorer, entry.Hash, seen); err != nil {
+				return err
+			}
+		}
+	}
+
+	if _, err := dstStorer.SetEncodedObject(obj); err != nil {
+		return fmt.Errorf("store %s: %w", hash, err)
+	}
+
+	return nil
+}
+
+func writeSingleCommit(storer storage.Storer, p pendingCommit, lastHash plumbing.Hash, seen map[plumbing.Hash]bool) (plumbing.Hash, error) {
+	if err := copyObject(p.srcStorer, storer, p.tree, seen); err != nil {
+		return plumbing.ZeroHash, fmt.Errorf("copy objects for %s: %w", p.hash, err)
+	}
+
 	msg := appendMirroredFrom(p.msg, p.path, p.hash.String())
 
 	var parentHashes []plumbing.Hash
@@ -37,8 +79,9 @@ func writeSingleCommit(storer storage.Storer, p pendingCommit, lastHash plumbing
 }
 
 func writeCommits(storer storage.Storer, pending []pendingCommit, lastHash plumbing.Hash) (plumbing.Hash, error) {
+	seen := make(map[plumbing.Hash]bool)
 	for _, p := range pending {
-		newHash, err := writeSingleCommit(storer, p, lastHash)
+		newHash, err := writeSingleCommit(storer, p, lastHash, seen)
 		if err != nil {
 			return plumbing.ZeroHash, err
 		}

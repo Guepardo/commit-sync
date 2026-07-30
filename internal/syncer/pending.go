@@ -40,6 +40,7 @@ func collectFromRepo(r scanner.ScanResult, dedup map[string]bool) []pendingCommi
 			tree:      c.TreeHash,
 			msg:       c.Message,
 			when:      c.Author.When,
+			srcStorer: repo.Storer,
 		})
 		return nil
 	})

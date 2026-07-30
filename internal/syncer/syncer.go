@@ -10,6 +10,7 @@ import (
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
+	"github.com/go-git/go-git/v5/storage"
 
 	"github.com/Guepardo/commit-sync/internal/scanner"
 )
@@ -26,6 +27,7 @@ type pendingCommit struct {
 	tree      plumbing.Hash
 	msg       string
 	when      time.Time
+	srcStorer storage.Storer
 }
 
 func parseMirroredFrom(msg string) (path, hash string, ok bool) {
