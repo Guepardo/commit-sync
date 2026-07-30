@@ -1,0 +1,40 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: stable
+
+      - name: Tests + Coverage
+        run: |
+          go test -coverprofile=coverage.out -covermode=count ./...
+          coverage=$(go tool cover -func=coverage.out | grep total | awk '{print substr($3, 1, length($3)-1)}')
+          echo "coverage=$coverage%" >> $GITHUB_STEP_SUMMARY
+          if (( $(echo "$coverage < 70" | bc -l) )); then
+            echo "FAIL: coverage $coverage% is below 70%"
+            exit 1
+          fi
+          echo "PASS: coverage $coverage% meets 70% threshold"
+
+      - name: Cyclomatic Complexity
+        run: |
+          go run github.com/fzipp/gocyclo/cmd/gocyclo -avg -over 10 ./ | tee -a $GITHUB_STEP_SUMMARY
+          output=$(go run github.com/fzipp/gocyclo/cmd/gocyclo -over 10 ./)
+          if [ -n "$output" ]; then
+            echo "FAIL: cyclomatic complexity exceeds 10"
+            echo "$output"
+            exit 1
+          fi
+          echo "PASS: all functions have complexity <= 10"
