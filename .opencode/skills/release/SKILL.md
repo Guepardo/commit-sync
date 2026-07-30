@@ -66,5 +66,5 @@ Exibir algo como:
 ✓ Release v1.3.0 criada com sucesso
   → git push origin v1.3.0 (ok)
   → A GitHub Action de release será disparada automaticamente
-  → Acompanhe em: https://github.com/allyson/commit-sync/actions
+  → Acompanhe em: https://github.com/Guepardo/commit-sync/actions
 ```

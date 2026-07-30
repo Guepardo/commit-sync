@@ -11,7 +11,7 @@ import (
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
 
-	"github.com/allyson/commit-sync/internal/scanner"
+	"github.com/Guepardo/commit-sync/internal/scanner"
 )
 
 func initRepo(t *testing.T, path string) *git.Repository {

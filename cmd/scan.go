@@ -5,8 +5,8 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/allyson/commit-sync/internal/config"
-	"github.com/allyson/commit-sync/internal/scanner"
+	"github.com/Guepardo/commit-sync/internal/config"
+	"github.com/Guepardo/commit-sync/internal/scanner"
 )
 
 var scanCmd = &cobra.Command{

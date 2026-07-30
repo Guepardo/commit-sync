@@ -7,7 +7,7 @@ import (
 	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/spf13/cobra"
 
-	"github.com/allyson/commit-sync/internal/config"
+	"github.com/Guepardo/commit-sync/internal/config"
 )
 
 var statusCmd = &cobra.Command{

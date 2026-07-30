@@ -56,12 +56,46 @@ Repositórios Git sem remote (criados com `git init` para experimentos ou estudo
 
 ## Instalação
 
-```bash
-# Com Go instalado
-go install github.com/allyson/commit-sync@latest
+### Binário pré-compilado (recomendado)
 
-# Ou build local
-git clone <url>
+Baixe o arquivo correspondente ao seu SO/arquitetura da [página de releases](https://github.com/Guepardo/commit-sync/releases), extraia e coloque o binário no `PATH`:
+
+```bash
+# Linux x86-64
+curl -LO https://github.com/Guepardo/commit-sync/releases/download/v0.0.1/commit-sync_v0.0.1_linux_amd64.tar.gz
+tar xzf commit-sync_v0.0.1_linux_amd64.tar.gz
+sudo install commit-sync /usr/local/bin/
+
+# Linux ARM64
+curl -LO https://github.com/Guepardo/commit-sync/releases/download/v0.0.1/commit-sync_v0.0.1_linux_arm64.tar.gz
+tar xzf commit-sync_v0.0.1_linux_arm64.tar.gz
+sudo install commit-sync /usr/local/bin/
+
+# macOS (Intel)
+curl -LO https://github.com/Guepardo/commit-sync/releases/download/v0.0.1/commit-sync_v0.0.1_darwin_amd64.tar.gz
+tar xzf commit-sync_v0.0.1_darwin_amd64.tar.gz
+sudo install commit-sync /usr/local/bin/
+
+# macOS (Apple Silicon)
+curl -LO https://github.com/Guepardo/commit-sync/releases/download/v0.0.1/commit-sync_v0.0.1_darwin_arm64.tar.gz
+tar xzf commit-sync_v0.0.1_darwin_arm64.tar.gz
+sudo install commit-sync /usr/local/bin/
+
+# Windows (PowerShell)
+# Baixe https://github.com/Guepardo/commit-sync/releases/download/v0.0.1/commit-sync_v0.0.1_windows_amd64.zip
+# Extraia e adicione ao PATH manualmente
+```
+
+### Via Go
+
+```bash
+go install github.com/Guepardo/commit-sync@latest
+```
+
+### Build local
+
+```bash
+git clone https://github.com/Guepardo/commit-sync.git
 cd commit-sync
 go build -o commit-sync .
 ```

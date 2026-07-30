@@ -1,6 +1,6 @@
 # commit-sync — AGENTS.md
 
-- **Module**: `github.com/allyson/commit-sync` — single module, no monorepo
+- **Module**: `github.com/Guepardo/commit-sync` — single module, no monorepo
 - **Entrypoint**: `main.go` → `cmd.Execute()`
 - **CLI framework**: `github.com/spf13/cobra`
 - **Git library**: `github.com/go-git/go-git/v5` (pure Go, no shell `git`)

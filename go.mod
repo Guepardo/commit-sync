@@ -1,4 +1,4 @@
-module github.com/allyson/commit-sync
+module github.com/Guepardo/commit-sync
 
 go 1.25.4
 

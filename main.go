@@ -1,6 +1,6 @@
 package main
 
-import "github.com/allyson/commit-sync/cmd"
+import "github.com/Guepardo/commit-sync/cmd"
 
 func main() {
 	cmd.Execute()
