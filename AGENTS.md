@@ -40,3 +40,12 @@
 - `internal/` — three packages: `config`, `scanner`, `syncer`
 - `tools/tools.go` — build-tag-gated import pin for `gocyclo` (never edit)
 - `.gitignore` ignores root binary `commit-sync`, `/tmp/`, `*.test`
+
+## Release
+
+| skill | `use the release skill` — cria tag semântica e push |
+|---|---|
+| trigger | push de tag `v*` → `.github/workflows/release.yml` compila e publica no GitHub Releases via GoReleaser |
+| config | `.goreleaser.yaml` — build cruzado linux/darwin/windows × amd64/arm64 |
+
+Use a **release skill** (`use the release skill`) quando quiser criar uma nova versão. Ela pergunta se o bump é `minir` (patch), `medium` (minor) ou `major`, calcula a próxima tag, cria e faz push. A Action de release cuida do resto.
