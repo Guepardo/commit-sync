@@ -68,6 +68,24 @@ func commitToRepo(t *testing.T, repo *git.Repository, msg, fileName, content str
 	return c
 }
 
+func getBranches(t *testing.T, repoPath string) []string {
+	t.Helper()
+	repo, err := git.PlainOpen(repoPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var branches []string
+	iter, err := repo.Branches()
+	if err != nil {
+		t.Fatal(err)
+	}
+	iter.ForEach(func(ref *plumbing.Reference) error {
+		branches = append(branches, ref.Name().String())
+		return nil
+	})
+	return branches
+}
+
 func TestSyncerSyncsCommitsToMirror(t *testing.T) {
 	dir := t.TempDir()
 
@@ -81,7 +99,7 @@ func TestSyncerSyncsCommitsToMirror(t *testing.T) {
 
 	s := New(mirrorDir)
 	repos := []scanner.ScanResult{
-		{Path: sourceDir, DefaultBranch: "refs/heads/main"},
+		{Path: sourceDir, DefaultBranch: "refs/heads/main", Branches: getBranches(t, sourceDir)},
 	}
 	n, err := s.Sync(repos)
 	if err != nil {
@@ -143,7 +161,7 @@ func TestSyncerSkipsAlreadySyncedCommits(t *testing.T) {
 	mirrorDir := filepath.Join(dir, "mirror")
 	s := New(mirrorDir)
 	repos := []scanner.ScanResult{
-		{Path: sourceDir, DefaultBranch: "refs/heads/main"},
+		{Path: sourceDir, DefaultBranch: "refs/heads/main", Branches: getBranches(t, sourceDir)},
 	}
 	n, err := s.Sync(repos)
 	if err != nil {
@@ -172,7 +190,7 @@ func TestSyncerSyncsOnlyNewCommits(t *testing.T) {
 	mirrorDir := filepath.Join(dir, "mirror")
 	s := New(mirrorDir)
 	repos := []scanner.ScanResult{
-		{Path: sourceDir, DefaultBranch: "refs/heads/main"},
+		{Path: sourceDir, DefaultBranch: "refs/heads/main", Branches: getBranches(t, sourceDir)},
 	}
 	s.Sync(repos)
 
@@ -233,7 +251,7 @@ func TestSyncerSkipsMergeCommits(t *testing.T) {
 	mirrorDir := filepath.Join(dir, "mirror")
 	s := New(mirrorDir)
 	repos := []scanner.ScanResult{
-		{Path: sourceDir, DefaultBranch: "refs/heads/main"},
+		{Path: sourceDir, DefaultBranch: "refs/heads/main", Branches: getBranches(t, sourceDir)},
 	}
 	_, syncErr := s.Sync(repos)
 	if syncErr != nil {
@@ -272,7 +290,7 @@ func TestSyncerDryRun(t *testing.T) {
 	s := New(mirrorDir)
 	s.SetDryRun(true)
 	repos := []scanner.ScanResult{
-		{Path: sourceDir, DefaultBranch: "refs/heads/main"},
+		{Path: sourceDir, DefaultBranch: "refs/heads/main", Branches: getBranches(t, sourceDir)},
 	}
 	n, err := s.Sync(repos)
 	if err != nil {
@@ -299,7 +317,7 @@ func TestSyncerPreservesMetadata(t *testing.T) {
 	mirrorDir := filepath.Join(dir, "mirror")
 	s := New(mirrorDir)
 	repos := []scanner.ScanResult{
-		{Path: sourceDir, DefaultBranch: "refs/heads/main"},
+		{Path: sourceDir, DefaultBranch: "refs/heads/main", Branches: getBranches(t, sourceDir)},
 	}
 	s.Sync(repos)
 
@@ -319,8 +337,13 @@ func TestSyncerPreservesMetadata(t *testing.T) {
 	if mirrorCommit.Committer.Name != orig.Committer.Name {
 		t.Fatalf("committer name: expected %q, got %q", orig.Committer.Name, mirrorCommit.Committer.Name)
 	}
-	if mirrorCommit.TreeHash != orig.TreeHash {
-		t.Fatalf("tree hash differs")
+	// Tree is empty in the mirror (we don't copy blobs)
+	tree, err := mirrorRepo.TreeObject(mirrorCommit.TreeHash)
+	if err != nil {
+		t.Fatalf("get mirror tree: %v", err)
+	}
+	if len(tree.Entries) != 0 {
+		t.Fatalf("expected empty tree, got %d entries", len(tree.Entries))
 	}
 }
 
@@ -337,6 +360,86 @@ func TestSyncerMirrorInitCreatesRepo(t *testing.T) {
 		t.Fatalf("mirror should have been initialized: %v", err)
 	}
 	_ = repo
+}
+
+func TestSyncerSyncsMultipleBranches(t *testing.T) {
+	dir := t.TempDir()
+
+	sourceDir := filepath.Join(dir, "multibranch")
+	sourceRepo := initRepo(t, sourceDir)
+
+	commitToRepo(t, sourceRepo, "root", "a.txt", "a")
+	c2 := commitToRepo(t, sourceRepo, "main work", "b.txt", "b")
+
+	mainHash, _ := sourceRepo.Head()
+
+	refName := plumbing.ReferenceName("refs/heads/feature")
+	ref := plumbing.NewHashReference(refName, mainHash.Hash())
+	sourceRepo.Storer.SetReference(ref)
+
+	w, _ := sourceRepo.Worktree()
+	w.Checkout(&git.CheckoutOptions{Branch: refName})
+	c3 := commitToRepo(t, sourceRepo, "feature work", "c.txt", "c")
+
+	w.Checkout(&git.CheckoutOptions{Branch: plumbing.ReferenceName("refs/heads/main")})
+
+	mirrorDir := filepath.Join(dir, "mirror")
+	s := New(mirrorDir)
+	branches := getBranches(t, sourceDir)
+	repos := []scanner.ScanResult{
+		{Path: sourceDir, DefaultBranch: "refs/heads/main", Branches: branches},
+	}
+	n, err := s.Sync(repos)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n != 3 {
+		t.Fatalf("expected 3 synced commits (root + main work + feature work), got %d", n)
+	}
+
+	mirrorRepo, _ := git.PlainOpen(mirrorDir)
+	head, err := mirrorRepo.Head()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	count := 0
+	var mirrorCommits []*object.Commit
+	iter, _ := mirrorRepo.Log(&git.LogOptions{From: head.Hash()})
+	iter.ForEach(func(c *object.Commit) error {
+		count++
+		mirrorCommits = append(mirrorCommits, c)
+		return nil
+	})
+	iter.Close()
+
+	if count != 3 {
+		t.Fatalf("expected 3 mirror commits, got %d", count)
+	}
+
+	// Latest commit should be feature work (latest timestamp)
+	if !strings.Contains(mirrorCommits[0].Message, c3.Message) {
+		t.Fatalf("expected latest commit to be feature work, got %q", mirrorCommits[0].Message)
+	}
+
+	// Verify source branch refs exist (go-git PlainInit creates "master" by default)
+	sourceRef, err := mirrorRepo.Reference(plumbing.ReferenceName("refs/heads/source/multibranch/master"), false)
+	if err != nil {
+		t.Fatalf("expected source/master ref: %v", err)
+	}
+	lastMainCommit, _ := mirrorRepo.CommitObject(sourceRef.Hash())
+	if !strings.Contains(lastMainCommit.Message, c2.Message) {
+		t.Fatalf("source/master should point to c2, got %q", lastMainCommit.Message)
+	}
+
+	featureRef, err := mirrorRepo.Reference(plumbing.ReferenceName("refs/heads/source/multibranch/feature"), false)
+	if err != nil {
+		t.Fatalf("expected source/feature ref: %v", err)
+	}
+	lastFeatureCommit, _ := mirrorRepo.CommitObject(featureRef.Hash())
+	if !strings.Contains(lastFeatureCommit.Message, c3.Message) {
+		t.Fatalf("source/feature should point to c3, got %q", lastFeatureCommit.Message)
+	}
 }
 
 func TestParseMirroredFrom(t *testing.T) {

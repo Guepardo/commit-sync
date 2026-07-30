@@ -7,6 +7,7 @@ import (
 
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/config"
+	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
 )
 
@@ -76,6 +77,9 @@ func TestScanFindsRepoWithoutRemote(t *testing.T) {
 	}
 	if results[0].Path != repoA {
 		t.Fatalf("expected %q, got %q", repoA, results[0].Path)
+	}
+	if len(results[0].Branches) != 1 {
+		t.Fatalf("expected 1 branch, got %v", results[0].Branches)
 	}
 }
 
@@ -156,6 +160,29 @@ func TestScanFindsMultipleRepos(t *testing.T) {
 	}
 	if len(results) != 2 {
 		t.Fatalf("expected 2 results, got %d", len(results))
+	}
+}
+
+func TestScanReportsBranches(t *testing.T) {
+	dir := t.TempDir()
+
+	repoDir := filepath.Join(dir, "myrepo")
+	r := initRepo(t, repoDir)
+	commitToRepo(t, r, "first", "a.txt", "a")
+
+	refName := plumbing.ReferenceName("refs/heads/feature")
+	ref := plumbing.NewHashReference(refName, plumbing.ZeroHash)
+	r.Storer.SetReference(ref)
+
+	results, err := Scan(dir, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(results) != 1 {
+		t.Fatalf("expected 1 result, got %d", len(results))
+	}
+	if len(results[0].Branches) != 2 {
+		t.Fatalf("expected 2 branches, got %v", results[0].Branches)
 	}
 }
 

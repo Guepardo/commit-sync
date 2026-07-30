@@ -9,6 +9,7 @@ import (
 type ScanResult struct {
 	Path          string
 	DefaultBranch string
+	Branches      []string
 	CommitCount   int
 }
 

@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 
 	"github.com/go-git/go-git/v5"
+	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
 )
 
@@ -24,12 +25,21 @@ func processGitDir(repoDir string, seen map[string]bool) (*ScanResult, error) {
 		return nil, nil
 	}
 
-	branch := ""
+	var branches []string
+	branchIter, err := r.Branches()
+	if err == nil {
+		branchIter.ForEach(func(ref *plumbing.Reference) error {
+			branches = append(branches, ref.Name().String())
+			return nil
+		})
+	}
+
+	defaultBranch := ""
 	commitCount := 0
 
 	head, err := r.Head()
 	if err == nil {
-		branch = head.Name().String()
+		defaultBranch = head.Name().String()
 		cIter, err := r.Log(&git.LogOptions{From: head.Hash()})
 		if err == nil {
 			cIter.ForEach(func(c *object.Commit) error {
@@ -41,7 +51,8 @@ func processGitDir(repoDir string, seen map[string]bool) (*ScanResult, error) {
 
 	return &ScanResult{
 		Path:          repoDir,
-		DefaultBranch: branch,
+		DefaultBranch: defaultBranch,
+		Branches:      branches,
 		CommitCount:   commitCount,
 	}, nil
 }

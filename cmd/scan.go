@@ -34,8 +34,12 @@ var scanCmd = &cobra.Command{
 		fmt.Printf("Found %d repo(s) without remotes:\n\n", len(results))
 		for _, r := range results {
 			fmt.Printf("  %s\n", r.Path)
-			fmt.Printf("    Branch: %s\n", r.DefaultBranch)
-			fmt.Printf("    Commits: %d\n", r.CommitCount)
+			fmt.Printf("    Default branch: %s\n", r.DefaultBranch)
+			fmt.Printf("    Branches (%d):\n", len(r.Branches))
+			for _, b := range r.Branches {
+				fmt.Printf("      - %s\n", b)
+			}
+			fmt.Printf("    Commits (default branch): %d\n", r.CommitCount)
 		}
 		return nil
 	},
