@@ -3,6 +3,7 @@ module github.com/allyson/commit-sync
 go 1.25.4
 
 require (
+	github.com/fzipp/gocyclo v0.6.0
 	github.com/go-git/go-git/v5 v5.19.2
 	github.com/spf13/cobra v1.10.2
 )
