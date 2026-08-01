@@ -122,6 +122,33 @@ func (m *MirrorRepo) writeSingleCommit(p pendingCommit, lastHash plumbing.Hash) 
 	return newHash, nil
 }
 
+func (m *MirrorRepo) Apply(pending []pendingCommit, sourceTips, existingSrcToMirror map[string]plumbing.Hash) (int, error) {
+	lastHash := m.HeadHash()
+
+	newSrcToMirror := make(map[string]plumbing.Hash)
+	if len(pending) > 0 {
+		var err error
+		lastHash, newSrcToMirror, err = m.WriteCommits(pending, lastHash)
+		if err != nil {
+			return 0, err
+		}
+	}
+
+	for k, v := range newSrcToMirror {
+		existingSrcToMirror[k] = v
+	}
+
+	branchTips := buildBranchTips(sourceTips, existingSrcToMirror)
+
+	if lastHash != plumbing.ZeroHash {
+		if err := m.UpdateRefs(lastHash, branchTips); err != nil {
+			return 0, err
+		}
+	}
+
+	return len(pending), nil
+}
+
 func (m *MirrorRepo) UpdateRefs(lastHash plumbing.Hash, branchTips map[string]plumbing.Hash) error {
 	storer := m.repo.Storer
 	ref := plumbing.NewHashReference(plumbing.ReferenceName(mirrorBranch), lastHash)
@@ -143,5 +170,3 @@ func (m *MirrorRepo) UpdateRefs(lastHash plumbing.Hash, branchTips map[string]pl
 
 	return nil
 }
-
-

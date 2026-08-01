@@ -47,15 +47,12 @@ func collectFromRepo(r scanner.ScanResult, dedup map[string]bool, seen map[strin
 			}
 			seen[k] = true
 			pending = append(pending, pendingCommit{
-				path:         r.Path,
-				sourceBranch: branch,
-				hash:         c.Hash,
-				author:       c.Author,
-				committer:    c.Committer,
-				tree:         c.TreeHash,
-				msg:          c.Message,
-				when:         c.Author.When,
-				srcStorer:    repo.Storer,
+				path:      r.Path,
+				hash:      c.Hash,
+				author:    c.Author,
+				committer: c.Committer,
+				msg:       c.Message,
+				when:      c.Author.When,
 			})
 			return nil
 		})

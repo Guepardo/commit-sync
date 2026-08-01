@@ -10,7 +10,6 @@ import (
 
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
-	"github.com/go-git/go-git/v5/storage"
 
 	"github.com/Guepardo/commit-sync/internal/scanner"
 )
@@ -20,15 +19,12 @@ const mirrorBranch = "refs/heads/main"
 var mirroredFromRe = regexp.MustCompile(`^Mirrored-From: (.+) ([a-f0-9]+)$`)
 
 type pendingCommit struct {
-	path         string
-	sourceBranch string
-	hash         plumbing.Hash
-	author       object.Signature
-	committer    object.Signature
-	tree         plumbing.Hash
-	msg          string
-	when         time.Time
-	srcStorer    storage.Storer
+	path      string
+	hash      plumbing.Hash
+	author    object.Signature
+	committer object.Signature
+	msg       string
+	when      time.Time
 }
 
 func parseMirroredFrom(msg string) (path, hash string, ok bool) {
@@ -93,29 +89,7 @@ func (s *Syncer) Sync(repos []scanner.ScanResult) (int, error) {
 		return len(pending), nil
 	}
 
-	lastHash := mirror.HeadHash()
-
-	newSrcToMirror := make(map[string]plumbing.Hash)
-	if len(pending) > 0 {
-		lastHash, newSrcToMirror, err = mirror.WriteCommits(pending, lastHash)
-		if err != nil {
-			return 0, err
-		}
-	}
-
-	for k, v := range newSrcToMirror {
-		existingSrcToMirror[k] = v
-	}
-
-	branchTips := buildBranchTips(sourceTips, existingSrcToMirror)
-
-	if lastHash != plumbing.ZeroHash {
-		if err := mirror.UpdateRefs(lastHash, branchTips); err != nil {
-			return 0, err
-		}
-	}
-
-	return len(pending), nil
+	return mirror.Apply(pending, sourceTips, existingSrcToMirror)
 }
 
 func buildBranchTips(sourceTips, existingSrcToMirror map[string]plumbing.Hash) map[string]plumbing.Hash {
